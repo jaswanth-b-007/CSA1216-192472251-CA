@@ -1,0 +1,62 @@
+#include <stdio.h>
+ 
+#define N 8
+ 
+void non_restoring_division(int dividend, int divisor, int *quot, int *rem, int *op_count) {
+    int A = 0;
+    int Q = dividend;
+    int M = divisor;
+    int ops = 0;
+ 
+    for (int I = 0; I < N; i++) {
+        /* shift A|Q left by 1 */
+        A = (A << 1) | ((Q >> (N – 1)) & 1);
+        Q = (Q << 1) & 0xFF;
+ 
+        if (A >= 0) {
+            A = A – M;           /* previous remainder was >= 0 -> subtract */
+        } else {
+            A = A + M;           /* previous remainder was < 0  -> add     */
+        }
+        ops++;                   /* exactly ONE operation per bit – no restore */
+ 
+        if (A >= 0) {
+            Q = Q | 1;           /* quotient bit = 1 */
+        } else {
+            Q = Q & ~1;          /* quotient bit = 0 */
+        }
+    }
+ 
+    /* single final correction if the last remainder ended up negative */
+    if (A < 0) {
+        A = A + M;
+        ops++;
+    }
+ 
+    *quot = Q;
+    *rem = A;
+    *op_count = ops;
+}
+ 
+int main() {
+    int dividend = 155, divisor = 6;
+    int quot, rem, ops_new;
+    int ops_old = 13;   /* measured from the restoring-division run */
+ 
+    non_restoring_division(dividend, divisor, &quot, &rem, &ops_new);
+ 
+    printf(“---------------------------------------------------------\n”);
+    printf(“ NON-RESTORING DIVISION – OPTIMISED SOLUTION\n”);
+    printf(“---------------------------------------------------------\n”);
+    printf(“ Dividend = %d, Divisor = %d\n”, dividend, divisor);
+    printf(“ Quotient = %d, Remainder = %d\n”, quot, rem);
+    printf(“ Total add/subtract operations performed = %d\n”, ops_new);
+    printf(“---------------------------------------------------------\n”);
+    printf(“ Restoring Division operations     : %d\n”, ops_old);
+    printf(“ Non-Restoring Division operations : %d\n”, ops_new);
+    printf(“ Operations saved                  : %d (%.1f%% fewer)\n”,
+           ops_old – ops_new,
+           100.0 * (ops_old – ops_new) / ops_old);
+    printf(“---------------------------------------------------------\n”);
+    return 0;
+}
