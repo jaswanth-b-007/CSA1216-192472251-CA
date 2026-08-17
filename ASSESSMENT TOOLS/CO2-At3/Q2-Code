@@ -1,0 +1,72 @@
+#include <stdio.h>
+ 
+#define BITS 16
+#define GATE_DELAY_NS 2
+#define CLA_FIXED_STAGES 3   /* G/P generation, carry generation, sum XOR */
+ 
+int carry_lookahead_add(int a, int b, int *total_delay_ns) {
+    int G[BITS], P[BITS], C[BITS + 1];
+    int sum = 0;
+ 
+    C[0] = 0;
+    /* Stage 1: Generate & Propagate signals computed for ALL bits
+       simultaneously (parallel hardware, not serial). */
+    for (int I = 0; I < BITS; i++) {
+        int bitA = (a >> i) & 1;
+        int bitB = (b >> i) & 1;
+        G[i] = bitA & bitB;          /* Generate */
+        P[i] = bitA ^ bitB;          /* Propagate */
+    }
+ 
+    /* Stage 2: every carry Ci+1 = Gi + (Pi . Ci) is expanded directly in
+       terms of the ORIGINAL inputs (Boolean algebra), so all carries
+       are ready almost simultaneously instead of rippling bit by bit. */
+    for (int I = 0; I < BITS; i++) {
+        int carry_term = 0;
+        int term = G[i];
+        for (int k = I – 1; k >= 0; k--) {
+            int p_product = 1;
+            for (int m = I; m > k; m--) p_product &= P[m];
+            term |= (p_product & G[k]);
+        }
+        /* incorporate initial carry-in (0 here) via P chain (implicit 0) */
+        (void)carry_term;
+        C[I + 1] = term;
+    }
+ 
+    /* Stage 3: final sum bits computed once carries are known */
+    for (int I = 0; I < BITS; i++) {
+        int s = P[i] ^ C[i];
+        sum |= (s << i);
+    }
+ 
+    /* Delay is CONSTANT (a fixed few gate-levels) regardless of BITS,
+       unlike the ripple design whose delay grows with bit-width. */
+    *total_delay_ns = CLA_FIXED_STAGES * GATE_DELAY_NS;
+    return sum;
+}
+ 
+int main() {
+    int a = 47521, b = 18374;
+    int delay_ns;
+ 
+    int result = carry_lookahead_add(a, b, &delay_ns);
+ 
+    int ripple_delay = BITS * GATE_DELAY_NS;
+ 
+    printf(“---------------------------------------------------------\n”);
+    printf(“ CARRY LOOK-AHEAD ADDER – OPTIMISED SOLUTION\n”);
+    printf(“---------------------------------------------------------\n”);
+    printf(“ A = %d, B = %d\n”, a, b);
+    printf(“ Sum = %d\n”, result);
+    printf(“ G/P signals generated for all %d bits IN PARALLEL.\n”, BITS);
+    printf(“ Total propagation delay = %d ns (fixed, %d stages x %d ns)\n”,
+           delay_ns, CLA_FIXED_STAGES, GATE_DELAY_NS);
+    printf(“---------------------------------------------------------\n”);
+    printf(“ Ripple Carry delay (16-bit) : %d ns\n”, ripple_delay);
+    printf(“ Carry Look-Ahead delay      : %d ns\n”, delay_ns);
+    printf(“ Speedup                     : %.2fx faster\n”,
+           (double)ripple_delay / delay_ns);
+    printf(“---------------------------------------------------------\n”);
+    return 0;
+}
