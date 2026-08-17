@@ -1,0 +1,47 @@
+#include <stdio.h>
+ 
+double kahan_sum(double values[], int n) {
+    double sum = 0.0;
+    double c = 0.0;              /* running compensation for lost low bits */
+    for (int i = 0; i < n; i++) {
+        double y = values[i] - c;
+        double t = sum + y;
+        c = (t - sum) - y;       /* recovers the bits that got rounded off */
+        sum = t;
+    }
+    return sum;
+}
+ 
+int main() {
+    /* ---------- Fix 1: double precision instead of float ---------- */
+    double large_d = 100000000.0;
+    double small_d = 0.0000001234;
+    double sum_d = large_d + small_d;
+ 
+    /* ---------- Fix 2: Kahan compensated summation ---------- */
+    double values[] = {100000000.0, 0.0000001234};
+    double kahan_result = kahan_sum(values, 2);
+ 
+    printf("---------------------------------------------------------\n");
+    printf(" IEEE 754 ADDITION (FIXED - double precision)\n");
+    printf("---------------------------------------------------------\n");
+    printf(" large  = %.10e\n", large_d);
+    printf(" small  = %.10e\n", small_d);
+    printf(" sum    = %.10e   (computed in double precision)\n", sum_d);
+    printf("---------------------------------------------------------\n");
+    if (sum_d != large_d) {
+        printf(" FIXED: 'small' now contributes to the sum.\n");
+        printf(" sum - large = %.10e (non-zero, small value preserved)\n",
+               sum_d - large_d);
+    } else {
+        printf(" Still equal at this magnitude difference (expected only\n");
+        printf(" for extremely large exponent gaps).\n");
+    }
+    printf("---------------------------------------------------------\n");
+    printf(" Kahan (compensated) summation result = %.10e\n", kahan_result);
+    printf(" -> Algorithmic technique that recovers rounding error lost\n");
+    printf("    during exponent alignment, improving accuracy further\n");
+    printf("    without needing a wider floating-point type.\n");
+    printf("---------------------------------------------------------\n");
+    return 0;
+}
