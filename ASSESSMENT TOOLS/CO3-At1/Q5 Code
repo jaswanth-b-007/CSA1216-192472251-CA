@@ -1,0 +1,119 @@
+"""
+Experiment 5: Superscalar, Out-of-Order, Speculative Execution and SMT
+Compares instruction throughput across four execution models on a
+single instruction stream (with two independent hardware threads
+for the SMT case).
+"""
+
+class Instruction:
+    def __init__(self, name, deps=None, is_branch=False):
+        self.name = name
+        self.deps = deps or []      # instructions this one depends on
+        self.is_branch = is_branch
+
+
+def scalar_execution(program):
+    """One instruction issued per cycle, in order."""
+    return len(program)
+
+
+def superscalar_execution(program, issue_width=2):
+    """Issue up to `issue_width` independent instructions per cycle,
+    still in program order (in-order superscalar)."""
+    cycles = 0
+    i = 0
+    issued_names = set()
+    while i < len(program):
+        batch = []
+        j = i
+        while j < len(program) and len(batch) < issue_width:
+            instr = program[j]
+            if all(d in issued_names for d in instr.deps):
+                batch.append(instr)
+                j += 1
+            else:
+                break
+        cycles += 1
+        for instr in batch:
+            issued_names.add(instr.name)
+        i = j if batch else i + 1
+    return cycles
+
+
+def out_of_order_execution(program, issue_width=2):
+    """Issue any ready instruction (regardless of program order) as
+    soon as its dependencies are satisfied - models a reorder buffer."""
+    remaining = list(program)
+    completed = set()
+    cycles = 0
+    while remaining:
+        ready = [instr for instr in remaining
+                 if all(d in completed for d in instr.deps)][:issue_width]
+        if not ready:
+            ready = remaining[:1]          # safety fallback
+        cycles += 1
+        for instr in ready:
+            completed.add(instr.name)
+            remaining.remove(instr)
+    return cycles
+
+
+def speculative_execution(program, branch_predicted_correctly=True):
+    """Executes past a branch speculatively; on misprediction the
+    speculatively issued instructions are squashed (penalty cycles)."""
+    cycles = out_of_order_execution(program, issue_width=2)
+    penalty = 0 if branch_predicted_correctly else 3
+    return cycles + penalty
+
+
+def smt_execution(thread_a, thread_b, issue_width=2):
+    """Simultaneous Multithreading: each cycle the issue slots can be
+    filled by ready instructions drawn from EITHER thread."""
+    streams = {"T0": list(thread_a), "T1": list(thread_b)}
+    completed = {"T0": set(), "T1": set()}
+    cycles = 0
+    while streams["T0"] or streams["T1"]:
+        slots = issue_width
+        cycles += 1
+        for tid in ("T0", "T1"):
+            queue = streams[tid]
+            issued_this_cycle = []
+            for instr in queue:
+                if slots == 0:
+                    break
+                if all(d in completed[tid] for d in instr.deps):
+                    issued_this_cycle.append(instr)
+                    slots -= 1
+            for instr in issued_this_cycle:
+                completed[tid].add(instr.name)
+                queue.remove(instr)
+    return cycles
+
+
+if __name__ == "__main__":
+    program = [
+        Instruction("I1"),
+        Instruction("I2"),
+        Instruction("I3", deps=["I1"]),
+        Instruction("I4"),
+        Instruction("I5", deps=["I3"]),
+        Instruction("I6", is_branch=True),
+    ]
+    thread_b = [Instruction("J1"), Instruction("J2"), Instruction("J3", deps=["J1"])]
+
+    n = len(program)
+    c_scalar = scalar_execution(program)
+    c_super = superscalar_execution(program, issue_width=2)
+    c_ooo = out_of_order_execution(program, issue_width=2)
+    c_spec_correct = speculative_execution(program, branch_predicted_correctly=True)
+    c_spec_wrong = speculative_execution(program, branch_predicted_correctly=False)
+    c_smt = smt_execution(program, thread_b, issue_width=2)
+
+    print(f"{'Model':35s}{'Cycles':>8s}{'Throughput (IPC)':>20s}")
+    print("-" * 63)
+    print(f"{'Scalar (1-wide, in-order)':35s}{c_scalar:8d}{n/c_scalar:20.2f}")
+    print(f"{'Superscalar (2-wide, in-order)':35s}{c_super:8d}{n/c_super:20.2f}")
+    print(f"{'Out-of-Order (2-wide)':35s}{c_ooo:8d}{n/c_ooo:20.2f}")
+    print(f"{'Speculative (correct prediction)':35s}{c_spec_correct:8d}{n/c_spec_correct:20.2f}")
+    print(f"{'Speculative (mispredicted, +3 flush)':35s}{c_spec_wrong:8d}{n/c_spec_wrong:20.2f}")
+    print(f"{'SMT (2 threads, 2-wide issue)':35s}{c_smt:8d}{(n+len(thread_b))/c_smt:20.2f}")
