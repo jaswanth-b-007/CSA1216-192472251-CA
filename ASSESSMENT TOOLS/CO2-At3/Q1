@@ -1,1 +1,67 @@
-
+#include <stdio.h>
+ 
+void to_binary8(unsigned char val, char *out) {
+    for (int I = 7; I >= 0; i--) {
+        out[7 – i] = ((val >> i) & 1) ? ‘1’ : ‘0’;
+    }
+    out[8] = ‘\0’;
+}
+ 
+int add8_fixed(signed char a, signed char b, signed char *result) {
+    unsigned char ua = (unsigned char)a;
+    unsigned char ub = (unsigned char)b;
+    unsigned int sum = 0;
+    unsigned int carry = 0;
+    unsigned int carry_into_msb = 0, carry_out_msb = 0;
+ 
+    /* bit-by-bit addition so we can capture the carry into and out of bit 7 */
+    for (int I = 0; I < 8; i++) {
+        unsigned int bitA = (ua >> i) & 1;
+        unsigned int bitB = (ub >> i) & 1;
+        unsigned int s = bitA ^ bitB ^ carry;
+        unsigned int new_carry = (bitA & bitB) | (bitA & carry) | (bitB & carry);
+ 
+        if (I == 7) carry_into_msb = carry;   /* carry coming INTO sign bit   */
+        sum |= (s << i);
+        carry = new_carry;
+    }
+    carry_out_msb = carry;                    /* carry going OUT of sign bit  */
+ 
+    *result = (signed char)(sum & 0xFF);
+ 
+    /* Overflow rule: carry_in != carry_out at the sign bit */
+    return (carry_into_msb != carry_out_msb);
+}
+ 
+int main() {
+    signed char a = 120;   /* 0111 1000 */
+    signed char b = 50;    /* 0011 0010 */
+    signed char result;
+    char binA[9], binB[9], binR[9];
+ 
+    to_binary8((unsigned char)a, binA);
+    to_binary8((unsigned char)b, binB);
+ 
+    int overflow = add8_fixed(a, b, &result);
+    to_binary8((unsigned char)result, binR);
+ 
+    printf(“---------------------------------------------------------\n”);
+    printf(“ 8-BIT SIGNED ADDITION (FIXED – overflow detected)\n”);
+    printf(“---------------------------------------------------------\n”);
+    printf(“ A = %4d  (binary %s)\n”, a, binA);
+    printf(“ B = %4d  (binary %s)\n”, b, binB);
+    printf(“ A + B (raw 8-bit result) = %4d (binary %s)\n”, result, binR);
+    printf(“---------------------------------------------------------\n”);
+    if (overflow) {
+        printf(“ OVERFLOW DETECTED! True sum (120+50=170) cannot fit\n”);
+        printf(“ in the signed 8-bit range [-128, 127].\n”);
+        printf(“ The stored bit pattern misleadingly reads as %d.\n”, result);
+        printf(“ Corrective action: promote to a wider type (int16_t) or\n”);
+        printf(“ saturate/flag the result instead of trusting the wraparound.\n”);
+    } else {
+        printf(“ No overflow. Result %d is valid.\n”, result);
+    }
+    printf(“---------------------------------------------------------\n”);
+    return 0;
+}
+ 
