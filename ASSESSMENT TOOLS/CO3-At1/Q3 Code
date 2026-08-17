@@ -1,0 +1,53 @@
+"""
+Experiment 3: 5-Stage Instruction Pipeline Simulator (F-D-E-M-W)
+Executes a stream of instructions on an ideal (no-hazard) pipeline
+and computes speedup & throughput versus a non-pipelined processor.
+"""
+
+STAGES = ["IF", "ID", "EX", "MEM", "WB"]
+
+
+def simulate_pipeline(instructions):
+    n = len(instructions)
+    num_stages = len(STAGES)
+    # instruction i occupies stage s at cycle (i + s)
+    total_cycles = n + num_stages - 1
+
+    print("=== Pipeline Execution Diagram ===")
+    header = "Instr\\Cyc |" + "".join(f"{c+1:^5}" for c in range(total_cycles))
+    print(header)
+    print("-" * len(header))
+    for i, instr in enumerate(instructions):
+        row = f"{instr:<9}|"
+        for c in range(total_cycles):
+            stage_index = c - i
+            if 0 <= stage_index < num_stages:
+                row += f"{STAGES[stage_index]:^5}"
+            else:
+                row += " " * 5
+        print(row)
+
+    return total_cycles
+
+
+def performance(n_instructions, pipelined_cycles, cycle_time_ns=1):
+    non_pipelined_cycles = n_instructions * len(STAGES)
+    speedup = non_pipelined_cycles / pipelined_cycles
+    throughput_pipelined = n_instructions / (pipelined_cycles * cycle_time_ns)
+    throughput_nonpipelined = n_instructions / (non_pipelined_cycles * cycle_time_ns)
+    return non_pipelined_cycles, speedup, throughput_pipelined, throughput_nonpipelined
+
+
+if __name__ == "__main__":
+    program = ["I1: ADD", "I2: SUB", "I3: AND", "I4: OR", "I5: LOAD"]
+
+    pipelined_cycles = simulate_pipeline(program)
+    non_pipelined_cycles, speedup, tp_pipe, tp_nonpipe = performance(
+        len(program), pipelined_cycles)
+
+    print(f"\nInstructions executed          : {len(program)}")
+    print(f"Non-pipelined cycles (5 x N)    : {non_pipelined_cycles}")
+    print(f"Pipelined cycles (N + 4)        : {pipelined_cycles}")
+    print(f"Speedup                         : {speedup:.2f}x")
+    print(f"Throughput (pipelined)          : {tp_pipe:.3f} instr/ns")
+    print(f"Throughput (non-pipelined)      : {tp_nonpipe:.3f} instr/ns")
