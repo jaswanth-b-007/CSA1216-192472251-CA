@@ -1,0 +1,66 @@
+"""
+Experiment 1: Register Transfer Operations and ALU Simulation
+Simulates multiple registers, a bus, and an ALU performing
+ADD, SUB, AND, OR operations, printing the micro-operation
+sequence at every step.
+"""
+
+class Register:
+    def __init__(self, name, value=0, width=8):
+        self.name = name
+        self.mask = (1 << width) - 1
+        self.value = value & self.mask
+
+    def load(self, data):
+        self.value = data & self.mask
+        print(f"  [RT] {self.name} <- {self.value:#06b}")
+
+    def __repr__(self):
+        return f"{self.name}={self.value}"
+
+
+class ALU:
+    """Performs arithmetic / logic micro-operations."""
+    def execute(self, op, a, b):
+        ops = {
+            "ADD": lambda x, y: x + y,
+            "SUB": lambda x, y: x - y,
+            "AND": lambda x, y: x & y,
+            "OR":  lambda x, y: x | y,
+        }
+        result = ops[op](a, b) & 0xFF
+        print(f"  [ALU] {op}: {a} , {b} -> {result}")
+        return result
+
+
+class CPU:
+    def __init__(self):
+        self.R = {name: Register(name) for name in ["R0", "R1", "R2", "R3"]}
+        self.alu = ALU()
+
+    def run_sequence(self, program):
+        print("=== Register Transfer & ALU Execution Trace ===")
+        for step, instr in enumerate(program, 1):
+            print(f"\nCycle {step}: {instr}")
+            op, dst, src1, src2 = instr
+            a = self.R[src1].value
+            b = self.R[src2].value if src2 in self.R else src2
+            result = self.alu.execute(op, a, b)
+            self.R[dst].load(result)
+        print("\nFinal Register File:", self.R)
+
+
+if __name__ == "__main__":
+    cpu = CPU()
+    cpu.R["R0"].load(12)
+    cpu.R["R1"].load(5)
+    cpu.R["R2"].load(9)
+
+    # (operation, destination, source1, source2)
+    program = [
+        ("ADD", "R3", "R0", "R1"),   # R3 <- R0 + R1
+        ("SUB", "R3", "R0", "R2"),   # R3 <- R0 - R2
+        ("AND", "R3", "R0", "R1"),   # R3 <- R0 AND R1
+        ("OR",  "R3", "R0", "R2"),   # R3 <- R0 OR  R2
+    ]
+    cpu.run_sequence(program)
