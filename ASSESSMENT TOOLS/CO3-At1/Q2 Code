@@ -1,0 +1,55 @@
+class SingleBusSystem:
+    """Only ONE common bus - every transfer uses it exclusively."""
+    def __init__(self):
+        self.cycles = 0
+        self.log = []
+
+    def transfer(self, src, dst):
+        self.cycles += 1                      # one transfer per cycle
+        self.log.append(f"Cycle {self.cycles}: {src} -> BUS -> {dst}")
+
+    def run(self, transfers):
+        for src, dst in transfers:
+            self.transfer(src, dst)
+        return self.cycles
+
+
+class MultiBusSystem:
+    """Three independent buses (A, B, C) allow parallel transfers."""
+    def __init__(self, num_buses=3):
+        self.num_buses = num_buses
+        self.cycles = 0
+        self.log = []
+
+    def run(self, transfers):
+        # group transfers into batches of `num_buses`
+        for i in range(0, len(transfers), self.num_buses):
+            batch = transfers[i:i + self.num_buses]
+            self.cycles += 1
+            for j, (src, dst) in enumerate(batch):
+                bus_name = chr(ord('A') + j)
+                self.log.append(
+                    f"Cycle {self.cycles} (Bus {bus_name}): {src} -> {dst}")
+        return self.cycles
+
+
+if __name__ == "__main__":
+    transfers = [
+        ("R1", "MEM"), ("R2", "MEM"), ("MEM", "R3"),
+        ("R4", "I/O"), ("I/O", "R5"), ("R1", "R6"),
+    ]
+
+    print("=== Single-Bus Organization ===")
+    sb = SingleBusSystem()
+    sb_cycles = sb.run(transfers)
+    print("\n".join(sb.log))
+    print(f"Total cycles (Single-Bus): {sb_cycles}")
+
+    print("\n=== Multi-Bus Organization (3 buses) ===")
+    mb = MultiBusSystem(num_buses=3)
+    mb_cycles = mb.run(transfers)
+    print("\n".join(mb.log))
+    print(f"Total cycles (Multi-Bus): {mb_cycles}")
+
+    speedup = sb_cycles / mb_cycles
+    print(f"\nEfficiency gain (speedup) of Multi-Bus over Single-Bus: {speedup:.2f}x")
