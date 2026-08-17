@@ -1,0 +1,80 @@
+#include <stdio.h>
+ 
+#define N 4  /* 4-bit operands */
+ 
+void print_bits(int val, int bits) {
+    for (int I = bits – 1; I >= 0; i--) printf(“%d”, (val >> i) & 1);
+}
+ 
+/* sign-extend a k-bit 2’s complement value to a normal int */
+int sign_extend(int val, int bits) {
+    int m = 1 << (bits – 1);
+    return (val ^ m) – m;
+}
+ 
+int booth_multiply_fixed(int M4, int Q4) {
+    int mask = (1 << N) – 1;
+ 
+    int M = sign_extend(M4 & mask, N);   /* real signed value of M */
+ 
+    int A = 0;      /* kept as a plain signed int, NOT masked to N bits */
+    int Q = Q4 & mask;
+    int Qm1 = 0;
+ 
+    printf(“ %-4s %-6s %-6s %-4s\n”, “Step”, “A”, “Q”, “Q-1”);
+    printf(“ %-4s “, “0”);
+    print_bits(A & mask, N); printf(“   “);
+    print_bits(Q & mask, N); printf(“   %-4d\n”, Qm1);
+ 
+    for (int I = 0; I < N; i++) {
+        int Q0 = Q & 1;
+        if (Q0 == 1 && Qm1 == 0) {
+            A = A – M;                      /* A = A – M (correct signed sub) */
+        } else if (Q0 == 0 && Qm1 == 1) {
+            A = A + M;                      /* A = A + M (correct signed add) */
+        }
+        /* Q0 == Qm1 (00 or 11): no arithmetic operation, just shift */
+ 
+        /* FIX: ARITHMETIC right shift of the combined A|Q|Q-1 register.
+           The sign bit of A is preserved (A >>= 1 on a signed int in C
+           performs an arithmetic shift on virtually all platforms/gcc,
+           i.e. it copies the sign bit into the vacated top bit). */
+        Qm1 = Q & 1;
+        Q = ((Q >> 1) | ((A & 1) << (N – 1))) & mask;
+        A = A >> 1;                         /* arithmetic shift – sign kept */
+ 
+        printf(“ %-4d “, I + 1);
+        print_bits(A & mask, N); printf(“   “);
+        print_bits(Q & mask, N); printf(“   %-4d\n”, Qm1);
+    }
+ 
+    /* Final product = (A concatenated with Q), a 2N-bit signed value */
+    int product = ((A & mask) << N) | (Q & mask);
+    return sign_extend(product, 2 * N);
+}
+ 
+int main() {
+    int M4 = -3 & 0xF;   /* multiplicand = -3 */
+    int Q4 = -5 & 0xF;   /* multiplier   = -5 */
+ 
+    printf(“---------------------------------------------------------\n”);
+    printf(“ BOOTH’S ALGORITHM (FIXED – arithmetic shift + sign ext.)\n”);
+    printf(“---------------------------------------------------------\n”);
+    printf(“ M = -3 (“);
+    print_bits(M4, N);
+    printf(“)   Q = -5 (“);
+    print_bits(Q4, N);
+    printf(“)\n\n”);
+ 
+    int product = booth_multiply_fixed(M4, Q4);
+ 
+    printf(“\n---------------------------------------------------------\n”);
+    printf(“ Final Product = %d (decimal)\n”, product);
+    printf(“ Expected mathematically: (-3) x (-5) = 15\n”);
+    if (product == 15)
+        printf(“ CORRECT: result now matches the expected value.\n”);
+    else
+        printf(“ STILL INCORRECT.\n”);
+    printf(“---------------------------------------------------------\n”);
+    return 0;
+}
