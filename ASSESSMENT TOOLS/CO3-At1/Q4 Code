@@ -1,0 +1,72 @@
+"""
+Experiment 4: Pipeline Hazards - Data, Control, Structural
+Demonstrates hazard detection and resolution using stalling,
+data forwarding, and branch prediction.
+"""
+
+class PipelineHazardSim:
+    def __init__(self):
+        self.stages = ["IF", "ID", "EX", "MEM", "WB"]
+
+    # ---------------- Data Hazard ----------------
+    def data_hazard_stall(self, instructions):
+        """RAW hazard resolved by inserting stall (bubble) cycles."""
+        print("\n--- Data Hazard: Resolved by STALLING ---")
+        cycle = 1
+        reg_ready_at = {}          # register -> cycle when value is ready (WB)
+        for idx, (instr, dst, src) in enumerate(instructions):
+            start = cycle
+            if src and src in reg_ready_at and reg_ready_at[src] > cycle + 1:
+                stall = reg_ready_at[src] - (cycle + 1)
+                print(f"  {instr}: STALL {stall} cycle(s) waiting for {src}")
+                cycle += stall
+            print(f"  {instr}: IF={cycle} ID={cycle+1} EX={cycle+2} "
+                  f"MEM={cycle+3} WB={cycle+4}")
+            reg_ready_at[dst] = cycle + 4
+            cycle += 1
+
+    def data_hazard_forwarding(self, instructions):
+        """Same hazard resolved with EX->EX forwarding (no stall needed)."""
+        print("\n--- Data Hazard: Resolved by FORWARDING ---")
+        for idx, (instr, dst, src) in enumerate(instructions):
+            if src:
+                print(f"  {instr}: value of {src} forwarded directly "
+                      f"from previous EX/MEM stage -> no stall")
+            else:
+                print(f"  {instr}: no dependency")
+
+    # ---------------- Control Hazard ----------------
+    def control_hazard_branch_prediction(self, taken=True):
+        print("\n--- Control Hazard: Resolved by BRANCH PREDICTION ---")
+        prediction = "TAKEN" if taken else "NOT TAKEN"
+        print(f"  BEQ R1,R2,LABEL  -> predicted {prediction}")
+        if taken:
+            print("  Fetch continues at LABEL immediately (no stall)")
+        else:
+            print("  Fetch continues sequentially (no stall)")
+        print("  If misprediction is detected at EX stage -> flush 2 fetched"
+              " instructions and restart fetch (branch penalty = 2 cycles)")
+
+    # ---------------- Structural Hazard ----------------
+    def structural_hazard(self):
+        print("\n--- Structural Hazard: Shared Memory Unit ---")
+        print("  I1 (LOAD) uses MEM stage at cycle 4")
+        print("  I4 (needs IF) also wants to access memory at cycle 4")
+        print("  Resolution: I4 is STALLED for 1 cycle so both instructions")
+        print("  do not access the single memory port simultaneously")
+
+
+if __name__ == "__main__":
+    sim = PipelineHazardSim()
+
+    # (instruction, destination_reg, source_reg_needed)
+    instrs = [
+        ("I1: ADD R1,R2,R3", "R1", None),
+        ("I2: SUB R4,R1,R5", "R4", "R1"),   # RAW hazard on R1
+        ("I3: AND R6,R4,R7", "R6", "R4"),   # RAW hazard on R4
+    ]
+
+    sim.data_hazard_stall(instrs)
+    sim.data_hazard_forwarding(instrs)
+    sim.control_hazard_branch_prediction(taken=True)
+    sim.structural_hazard()
